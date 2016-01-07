@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>[APUE] Ch 13. Daemon Process study note</title>
+<link rel="stylesheet" href="http://app.classeur.io/base-min.css" />
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML"></script>
+</head>
+<body><div class="export-container"><h1 id="apue-ch-13-daemon-process">[APUE] Ch 13 Daemon Process</h1>
+<div class="toc"><ul><li><a href="#apue-ch-13-daemon-process">[APUE] Ch 13 Daemon Process</a></li><li><a href="#what-is-daemon">What is Daemon</a></li><li><a href="#what-for">What for</a><ul><li><a href="#init">init</a></li><li><a href="#rpcbind">rpcbind</a></li><li><a href="#rsyslogd">rsyslogd</a></li><li><a href="#inetd">inetd</a></li><li><a href="#nfs--nfsd-nfsiod-lockd-rpciod-rpc.idmapd-rpc.statd-and-rpc.mountd">NFS ( nfsd, nfsiod, lockd, rpciod, rpc.idmapd, rpc.statd, and rpc.mountd)</a></li><li><a href="#cron">cron</a></li><li><a href="#sshd">sshd</a></li></ul></li><li><a href="#how-to-write-a-daemon">How to write a Daemon</a><ul><li><a href="#example-httpscodeshare.io3fc0z">Example: https://codeshare.io/3fC0z</a></li><li><a href="#steps">Steps:</a></li><li><a href="#result">Result:</a></li></ul></li><li><a href="#how-daemons-deal-error-logging">How Daemons deal error logging</a><ul><li><a href="#there-are-three-ways-to-generate-log-messages">There are three ways to generate log messages:</a></li><li><a href="#interface-of-syslog">Interface of syslog:</a><ul><li><a href="#the-openlog-function">The openlog function:</a></li><li><a href="#the-syslog-function">The syslog function:</a></li><li><a href="#example">example</a></li></ul></li></ul></li><li><a href="#single-instance-daemons">Single-Instance Daemons</a><ul><li><a href="#what-if-we-have-2-cron-instance...">What if we have 2 cron instance...</a></li><li><a href="#the-file--and-record-locking-mechanism">The file- and record-locking mechanism</a></li><li><a href="#example-of-using-file-locking-to-ensure-single-copy-of-daemon">Example of using file locking to ensure single copy of daemon</a></li></ul></li><li><a href="#daemon-conventions">Daemon Conventions</a></li><li><a href="#reference">Reference</a></li></ul></div><h1 id="what-is-daemon">What is Daemon</h1>
+<blockquote>
+<p>Daemons are processes that live for a long time.<br>
+<strong>Started</strong> when <strong>the system is bootstrapped</strong> and <strong>terminate</strong> only when <strong>the system is shut down.</strong><br>
+Because <strong>they don’t have a controlling terminal</strong>, we say that they run in the background.</p>
+</blockquote>
+<pre><code>ps -efj &gt; o //（結果重定向到文件裡方便處理）
+//e(every)代表所有進程；f(full)代表現實全部信息；j(job)job模式，結果如下圖：
+</code></pre>
+<p><img src="http://images2015.cnblogs.com/blog/707631/201510/707631-20151030104038247-747997289.jpg" alt="enter image description here"></p>
+<ul>
+<li>
+<p>Kernel processes are special and generally exist for the <strong>entire lifetime</strong> of the system.</p>
+</li>
+<li>
+<p>They run with <strong>superuser privileges</strong> and have <strong>no controlling terminal</strong> and no command line.</p>
+</li>
+<li>
+<p>Anything with a <strong>parent process ID of 0</strong> is usually a <strong>kernel process</strong> started as part of the<br>
+system bootstrap procedure. (An exception is <strong>/sbin/init</strong>, which is a user-level command<br>
+started by the kernel at boot time.)</p>
+</li>
+<li>
+<p>The <strong>parent of the user-level daemons</strong> is the <strong>/sbin/init</strong> process</p>
+</li>
+<li>
+<p>Kernel daemons appear with their names in <strong>square brackets</strong> .</p>
+</li>
+<li>
+<p><strong><code>kthreadd</code></strong> is the parent of the other kernel daemons.</p>
+</li>
+</ul>
+<h1 id="what-for">What for</h1>
+<h2 id="init">init</h2>
+<p><img src="http://web.cs.ucla.edu/classes/spring14/cs111/scribe/5a/init_linux.png" alt="enter image description here"></p>
+<h2 id="rpcbind">rpcbind</h2>
+<p><img src="https://encrypted-tbn2.gstatic.com/images?q=tbn:ANd9GcS25xM2JWR7RHobYn9EJIhuMBcDAPDrSP7LX4CYI_kMQs2T3IM7" alt="enter image description here"><br>
+<img src="https://www.cs.rutgers.edu/~pxk/417/notes/images/rpc-onc_lookup.png" alt="enter image description here"></p>
+<h2 id="rsyslogd">rsyslogd</h2>
+<p><img src="https://dn-linuxcn.qbox.me/data/attachment/album/201503/10/152630q6m2xkmhk2fc0lz8.png" alt="enter image description here"></p>
+<h2 id="inetd">inetd</h2>
+<p><img src="http://www.ibm.com/developerworks/aix/library/au-spunix-inetd/inetd.gif" alt="enter image description here"></p>
+<h2 id="nfs--nfsd-nfsiod-lockd-rpciod-rpc.idmapd-rpc.statd-and-rpc.mountd">NFS ( nfsd, nfsiod, lockd, rpciod, rpc.idmapd, rpc.statd, and rpc.mountd)</h2>
+<p><img src="http://swift.siphos.be/aglara/images/05-nfs.png" alt="enter image description here"></p>
+<h2 id="cron">cron</h2>
+<p><img src="http://www.javiernunez.com/wp-content/uploads/2015/06/crontab_explanation.png" alt="enter image description here"></p>
+<h2 id="sshd">sshd</h2>
+<p><img src="http://www-01.ibm.com/support/knowledgecenter/api/content/nl/zh-tw/SSWRCJ_3.5.0/com.ibm.safos.doc_3.5/ingox026.gif" alt="enter image description here"></p>
+<h1 id="how-to-write-a-daemon">How to write a Daemon</h1>
+<h2 id="example-httpscodeshare.io3fc0z">Example: <a href="https://codeshare.io/3fC0z">https://codeshare.io/3fC0z</a></h2>
+<h2 id="steps">Steps:</h2>
+<ol>
+<li>Call <strong><code>umask</code></strong> to set the file mode creation mask to a known value, usually 0.</li>
+<li>Call <strong><code>fork</code></strong> and have the parent exit.
+<ul>
+<li>The parent terminate makes the shell think that the command is done.</li>
+<li>To guarantee that the child is not a process group leader. This is a prerequisite for the call to <strong><code>setsid</code></strong>.</li>
+</ul>
+</li>
+<li>Call <strong><code>setsid</code></strong> to create a new session.<br>
+(a.) Becomes the leader of a new session<br>
+(b.) Becomes the leader of a new process group<br>
+(c.) Disassociated from its controlling terminal</li>
+<li>Change the current working directory to the root so we won’t prevent file systems from being unmounted.</li>
+<li>Unneeded file descriptors should be closed.</li>
+<li>Attach file descriptors 0, 1, and 2 to /dev/null.  (	Standard input, Standard output, 	Standard error)</li>
+<li>Initialize the log file.</li>
+</ol>
+<pre><code>#include &lt;stdio.h&gt; 
+#include &lt;stdlib.h&gt; 
+#include &lt;unistd.h&gt; 
+#include &lt;signal.h&gt; 
+#include &lt;sys/types.h&gt; 
+#include &lt;sys/stat.h&gt; 
+#include &lt;syslog .h&gt;
+
+static  void skeleton_daemon()
+{
+    pid_t pid;
+    
+    pid = fork(); // 1. fork off the parent process 
+    if (pid &lt; 0 ) {
+        exit(EXIT_FAILURE); 
+    } 
+    if (pid &gt; 0 ) { // 1. terminates the parent process 
+        exit(EXIT_SUCCESS);
+    } 
+    if (setsid()&lt; 0 ) { // 2. child process becomes session leader 
+        exit(EXIT_FAILURE);
+    } 
+    signal(SIGCHLD, SIG_IGN);
+    signal(SIGHUP,SIG_IGN);
+
+    pid = fork(); // 3. fork off the second time 
+    if (pid&lt; 0 ) {
+        exit(EXIT_FAILURE); 
+    }
+    if (pid&gt; 0 ) { // terminates the parents 
+        exit(EXIT_SUCCESS);
+    }
+
+    umask( 0 ); // 4. set new file permissions 
+
+    chdir( " / " ); // 5. change the working directory
+
+    int x; // 6. close all open file descriptors 
+    for (x=sysconf(_SC_OPEN_MAX); x&gt; 0 ; x-- )
+    {
+        close(x);
+    }
+	/*
+	 * 6. Attach file descriptors 0, 1, and 2 to /dev/null.
+	 */
+    int fd0, fd1, fd2;
+	fd0 = open("/dev/null", O_RDWR);
+	fd1 = dup(0);
+	fd2 = dup(0);
+  
+    openlog( " firstdaemon " , LOG_PID, LOG_DAEMON);
+}
+
+int main()
+{
+    skeleton_daemon();
+    while ( 1 )
+    {
+        syslog(LOG_NOTICE, " First daemon started. " );
+        sleep( 20 );
+         break ;
+    }
+
+    syslog(LOG_NOTICE, " First daemon terminated. " );
+    closelog();
+
+    return EXIT_SUCCESS;
+}
+</code></pre>
+<h2 id="result">Result:</h2>
+<p><img src="http://images2015.cnblogs.com/blog/707631/201510/707631-20151030145721294-949451840.jpg" alt="enter image description here"></p>
+<h1 id="how-daemons-deal-error-logging">How Daemons deal error logging</h1>
+<blockquote>
+<p>We also <strong>don’t want each daemon writing its own error messages into a separate file</strong>. It would be a headache for anyone administering the system to keep up with which daemon writes to which log file and to check these files on a regular basis. <strong>A central daemon error-logging facility is required.</strong></p>
+</blockquote>
+<p><img src="https://notes.shichao.io/apue/figure_13.2.png" alt="enter image description here"></p>
+<h2 id="there-are-three-ways-to-generate-log-messages">There are three ways to generate log messages:</h2>
+<ol>
+<li><strong>Kernel routines</strong> can call the <strong>log</strong> function.</li>
+<li>Most <strong>user processes</strong> (daemons) call the <strong>syslog(3)</strong> function to generate log<br>
+messages</li>
+<li>Send log messages to UDP port 514 by a <strong>TCP/IP network</strong>.</li>
+</ol>
+<h2 id="interface-of-syslog">Interface of syslog:</h2>
+<p><a href="https://codeshare.io/UqnrT">https://codeshare.io/UqnrT</a></p>
+<pre><code class="prism language-C++">#include &lt;syslog.h&gt;
+
+void openlog(const char *ident, int option, int facility);
+void syslog(int priority, const char *format, ...);
+void closelog(void);
+int setlogmask(int maskpri);
+
+/* Returns: previous log priority mask value */
+</code></pre>
+<ul>
+<li>Calling <code>openlog</code> is optional. If it’s not called, the first time syslog is called, openlog is called automatically.</li>
+<li>Calling <code>closelog</code> is also optional. It closes the descriptor being used to communicate with the syslogd daemon.</li>
+</ul>
+<h3 id="the-openlog-function">The <code>openlog</code> function:</h3>
+<pre><code>	void openlog(const char *ident, int option, int facility);
+</code></pre>
+<ul>
+<li>
+<p><em>indent</em><br>
+The name of the program.</p>
+</li>
+<li>
+<p><em>option</em> <img src="http://images2015.cnblogs.com/blog/707631/201510/707631-20151030145503763-319270674.jpg" alt="enter image description here"></p>
+<pre><code>![enter image description here](http://images2015.cnblogs.com/blog/707631/201510/707631-20151030150547419-282654541.jpg)
+</code></pre>
+</li>
+<li>
+<p><em>facility</em><br>
+	<img src="http://images2015.cnblogs.com/blog/707631/201510/707631-20151030150808138-1212309816.jpg" alt="enter image description here"></p>
+</li>
+</ul>
+<h3 id="the-syslog-function">The <code>syslog</code> function:</h3>
+<pre><code class="prism language-C++">void syslog(int priority, const char *format, ...);
+</code></pre>
+<ul>
+<li><em>priority</em><br>
+This argument is a combination of the <em>facility</em> and a <em>level</em><br>
+<img src="http://images2015.cnblogs.com/blog/707631/201510/707631-20151030151931029-360517255.jpg" alt="enter image description here"></li>
+<li><em>format</em><br>
+The <em>format</em> argument and any remaining arguments are passed to the <code>vsprintf</code> function for formatting.</li>
+</ul>
+<h3 id="example">example</h3>
+<pre><code class="prism language-C++">#include &lt;syslog.h&gt;
+
+int main( int argc, char ** argv)
+{
+    openlog( " test error " , LOG_CONS | LOG_PID, 0 );
+    syslog(LOG_INFO, " This is a syslog test message generated by program '%s'\n " , argv[ 0 ]);
+    closelog();
+    return  0 ;
+}
+</code></pre>
+<h1 id="single-instance-daemons">Single-Instance Daemons</h1>
+<h2 id="what-if-we-have-2-cron-instance...">What if we have 2 <code>cron</code> instance…</h2>
+<p><img src="http://static.thegeekstuff.com/wp-content/uploads/2009/06/linux-crontab-examples-300x270.png" alt="enter image description here">    <img src="http://static.thegeekstuff.com/wp-content/uploads/2009/06/linux-crontab-examples-300x270.png" alt="enter image description here"></p>
+<h2 id="the-file--and-record-locking-mechanism">The file- and record-locking mechanism</h2>
+<p>If each daemon creates <strong>a file with a fixed name</strong> and places a <strong>write lock on the entire file</strong>, only one such write lock will be allowed to be created. Successive attempts to create write locks will fail, serving as an indication to successive copies of the daemon that another instance is already running.</p>
+<h2 id="example-of-using-file-locking-to-ensure-single-copy-of-daemon">Example of using file locking to ensure single copy of daemon</h2>
+<p>Example: <a href="https://codeshare.io/rYG2s">https://codeshare.io/rYG2s</a></p>
+<pre><code>#include &lt;unistd.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;syslog.h&gt;
+#include &lt;string.h&gt;
+#include &lt;errno.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;sys/stat.h&gt;
+
+#define LOCKFILE "/var/run/daemon.pid"
+#define LOCKMODE (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
+
+extern int lockfile(int);
+
+int
+already_running(void)
+{
+    int     fd;
+    char    buf[16];
+
+    fd = open(LOCKFILE, O_RDWR|O_CREAT, LOCKMODE);
+    if (fd &lt; 0) {
+        syslog(LOG_ERR, "can't open %s: %s", LOCKFILE, strerror(errno));
+        exit(1);
+    }
+    if (lockfile(fd) &lt; 0) {  //lockfile is implement in CH14
+        if (errno == EACCES || errno == EAGAIN) {
+            close(fd);
+            return(1);
+        }
+        syslog(LOG_ERR, "can't lock %s: %s", LOCKFILE, strerror(errno));
+        exit(1);
+    }
+    ftruncate(fd, 0);
+    sprintf(buf, "%ld", (long)getpid());
+    write(fd, buf, strlen(buf)+1);
+    return(0);
+}
+</code></pre>
+<p>We need to truncate the file, because the <strong>previous instance</strong> of the daemon might<br>
+have had a process ID larger than ours, with a <strong>larger string length</strong>. For example, if the<br>
+previous instance of the daemon was process ID <strong>12345</strong>, and the new instance is process<br>
+ID <strong>9999</strong>, when we write the process ID to the file, we will be left with <strong>99995</strong> in the file.<br>
+Truncating the file prevents data from the previous daemon appearing as if it applies to<br>
+the current daemon.</p>
+<h1 id="daemon-conventions">Daemon Conventions</h1>
+<ul>
+<li>
+<p>The lock file is usually stored in <code>/var/run</code>.</p>
+<ul>
+<li>Creating a file in this directory requires superuser permissions;</li>
+<li>The name of the file is usually <code>name.pid</code>, where name is the name of the daemon or the service. For example, the name of the Linux cron daemon’s lock file is <code>/var/run/crond.pid</code>.</li>
+</ul>
+</li>
+<li>
+<p>The configuration options are usually stored in <code>/etc</code>.</p>
+<ul>
+<li>The configuration file is named <code>name.conf</code>, where <code>name</code> is the name of the daemon or the service. For example, the configuration for the <code>syslogd</code> daemon is usually <code>/etc/syslog.conf</code>.</li>
+</ul>
+</li>
+<li>
+<p>Daemons can be started from the command line, but they are usually started from one of the system initialization scripts (<code>/etc/rc*</code> or <code>/etc/init.d/*</code>).</p>
+</li>
+<li>
+<p>If a daemon has a configuration file, the daemon reads the file when it starts and won’t look at it again.</p>
+</li>
+<li>
+<p>To avoid this, some daemons will catch SIGHUP and reread their configuration files when they receive the signal.</p>
+</li>
+</ul>
+<h1 id="reference">Reference</h1>
+<ul>
+<li>[APUE book] Chapter13 Daemon Processes</li>
+<li><a href="http://www.cnblogs.com/xbf9xbf/p/4923491.html">APUE学习记录 by 承续缘</a></li>
+<li><a href="http://blog.csdn.net/cinmyheart/article/details/23103665">《APUE》chapter 13 Deamon Process 学习笔记(加上自己的代码)</a></li>
+<li><a href="http://www.tamabc.com/article/22148.html">daemon 進程爲什麽要fork兩次</a></li>
+<li><a href="http://fcamel-life.blogspot.tw/2012/01/signal.html">signal 小知識</a></li>
+<li><a href="http://stackoverflow.com/questions/4263173/redirecting-stdin-stdout-stderr-to-dev-null-in-c">Redirecting STDIN, STDOUT, STDERR to /dev/null in C - stackoverflow</a></li>
+</ul></div></body>
+</html>
